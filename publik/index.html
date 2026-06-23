@@ -1,1 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Product Video Generator</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        .hidden { display: none; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-top: 15px; border-radius: 8px; }
+        img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 10px; }
+        button { padding: 10px 15px; background: #4285F4; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #357ae8; }
+    </style>
+</head>
+<body>
+
+    <h2>AI Product Generator (TikTok 9:16)</h2>
+
+    <div id="login-section" class="box">
+        <p>Silakan login untuk menggunakan layanan ini.</p>
+        <button id="btn-login">Login dengan Google</button>
+    </div>
+
+    <div id="app-section" class="box hidden">
+        <p>Selamat datang, <span id="user-name"></span>!</p>
+        <button id="btn-logout" style="background: #db4437;">Logout</button>
+        <hr>
+        
+        <form id="generate-form">
+            <label><b>1. Gambar Background:</b></label><br>
+            <input type="file" id="bg-image" accept="image/*" required><br><br>
+
+            <label><b>2. Gambar Objek Produk:</b></label><br>
+            <input type="file" id="product-image" accept="image/*" required><br><br>
+
+            <button type="submit" id="btn-submit">Generate Gambar & Prompt Video</button>
+        </form>
+
+        <div id="loading" class="hidden"><p><i>Sedang memproses... Ini mungkin memakan waktu.</i></p></div>
+
+        <div id="result-section" class="hidden">
+            <h3>Hasil Generate Gambar:</h3>
+            <img id="result-image" src="" alt="Hasil AI">
+            
+            <h3>Prompt Video (Untuk Video Review 15 Detik):</h3>
+            <textarea id="result-prompt" rows="5" style="width: 100%;" readonly></textarea>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+
+    <script>
+        // MASUKKAN KONFIGURASI FIREBASE ANDA DI SINI
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLz-yJ0KGM5le9I4zmWEKlbCWjXkXO-HQ",
+            authDomain: "za-market-store.firebaseapp.com",
+            projectId: "za-market-store",
+            storageBucket: "za-market-store.firebasestorage.app",
+            messagingSenderId: "63256672222",
+            appId: "1:63256672222:web:1773c378f24c18f66f0f4f"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const storage = firebase.storage();
+
+        // Elemen DOM
+        const loginSection = document.getElementById('login-section');
+        const appSection = document.getElementById('app-section');
+        const userNameSpan = document.getElementById('user-name');
+        const resultSection = document.getElementById('result-section');
+        const loading = document.getElementById('loading');
+
+        // Auth State Observer
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                loginSection.classList.add('hidden');
+                appSection.classList.remove('hidden');
+                userNameSpan.innerText = user.displayName;
+            } else {
+                loginSection.classList.remove('hidden');
+                appSection.classList.add('hidden');
+            }
+        });
+
+        // Login / Logout Action
+        document.getElementById('btn-login').onclick = () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider);
+        };
+        document.getElementById('btn-logout').onclick = () => auth.signOut();
+
+        // Fungsi Upload ke Firebase Storage
+        async function uploadImage(file, path) {
+            const ref = storage.ref().child(`uploads/${Date.now()}_${path}`);
+            await ref.put(file);
+            return await ref.getDownloadURL();
+        }
+
+        // Submit Form
+        document.getElementById('generate-form').onsubmit = async (e) => {
+            e.preventDefault();
+            loading.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+
+            const bgFile = document.getElementById('bg-image').files[0];
+            const productFile = document.getElementById('product-image').files[0];
+
+            try {
+                // 1. Upload gambar ke Firebase Storage
+                const bgUrl = await uploadImage(bgFile, 'bg');
+                const productUrl = await uploadImage(productFile, 'product');
+
+                // 2. Kirim URL ke Vercel Backend
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ backgroundUrl: bgUrl, productUrl: productUrl })
+                });
+
+                const data = await response.json();
+
+                // 3. Tampilkan Hasil
+                document.getElementById('result-image').src = data.imageUrl;
+                document.getElementById('result-prompt').value = data.videoPrompt;
+                
+                loading.classList.add('hidden');
+                resultSection.classList.remove('hidden');
+
+            } catch (error) {
+                console.error(error);
+                alert("Terjadi kesalahan saat memproses data.");
+                loading.classList.add('hidden');
+            }
+        };
+    </script>
+</body>
+</html>
 
